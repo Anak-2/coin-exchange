@@ -29,6 +29,9 @@ out/
 ### Properties ###
 **/src/main/resources/*.yml
 
+## DB ###
+**/*.db
+
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
