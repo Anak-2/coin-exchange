@@ -1,4 +1,4 @@
-package coin.stock.global.component;
+package coin.stock.global.component.scheduler;
 
 import coin.stock.application.MarketService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -17,15 +17,9 @@ public class PerformanceTester {
         this.meterRegistry = meterRegistry;
     }
 
-    @Scheduled(fixedRate = 60000) // 1 minute interval
+    @Scheduled(fixedRate = 60000)
     public void testPerformance() {
         Timer restTemplateTimer = meterRegistry.timer("resttemplate.timer");
-        Timer webClientTimer = meterRegistry.timer("webclient.timer");
-
         restTemplateTimer.record(marketService::fetchAllMarketsWithRestTemplate);
-
-        webClientTimer.record(() -> {
-            marketService.getAllMarketsWithWebClient().block();
-        });
     }
 }
