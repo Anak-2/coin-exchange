@@ -42,4 +42,8 @@ public class TickerService {
             e.printStackTrace();
         }
     }
+
+    public void fetchTickerWithWebsocket(){
+
+    }
 }

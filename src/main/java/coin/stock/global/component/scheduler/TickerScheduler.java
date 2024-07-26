@@ -5,6 +5,7 @@ import coin.stock.application.TickerService;
 import coin.stock.entity.Market;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
 import java.util.Arrays;
