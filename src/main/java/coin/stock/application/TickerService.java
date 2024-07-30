@@ -62,7 +62,7 @@ public class TickerService {
     public void fetchTickerWithWebsocket(List<String> market){
         if (externalApiSocketSession != null && externalApiSocketSession.isOpen()) {
             String payload = createPayload(market);
-            log.info("Payload: {}", payload);
+            log.debug("FetchTickerWitWebsocket Payload: {}", payload);
             try {
                 externalApiSocketSession.sendMessage(new TextMessage(payload));
             } catch (Exception e) {
