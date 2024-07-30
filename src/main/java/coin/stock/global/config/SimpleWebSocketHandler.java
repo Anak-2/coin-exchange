@@ -1,5 +1,6 @@
 package coin.stock.global.config;
 
+import coin.stock.application.BatchService;
 import coin.stock.application.TickerService;
 import coin.stock.domain.TickerProperties;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,16 +14,20 @@ import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 public class SimpleWebSocketHandler extends BinaryWebSocketHandler {
 
     private final ObjectMapper objectMapper;
-    private final TickerService tickerService;
+    private final BatchService batchService;
+    private final List<TickerProperties> buffer = new ArrayList<>();
+    private static final int BUFFER_SIZE = 100;
 
-    public SimpleWebSocketHandler(ObjectMapper objectMapper, TickerService tickerService) {
+    public SimpleWebSocketHandler(ObjectMapper objectMapper, BatchService batchService) {
         this.objectMapper = objectMapper;
-        this.tickerService = tickerService;
+        this.batchService = batchService;
     }
 
     @Override
@@ -37,7 +42,12 @@ public class SimpleWebSocketHandler extends BinaryWebSocketHandler {
         String jsonString = StandardCharsets.UTF_8.decode(payload).toString();
         try {
             TickerProperties tickerProperties = objectMapper.readValue(jsonString, TickerProperties.class);
-            tickerService.save(tickerProperties);
+//            todo: 현재는 마켓 하나하나 insert 문이 나가도록 되어있음. Batch로 쿼리문 줄이기
+            buffer.add(tickerProperties);
+            if (buffer.size() >= BUFFER_SIZE) {
+                batchService.saveTickers(new ArrayList<>(buffer));
+                buffer.clear();
+            }
             log.info("Parsed JSON: {}", tickerProperties);
         } catch (Exception e) {
             log.error("Error parsing binary message: {}", e.getMessage());

@@ -1,5 +1,6 @@
 package coin.stock.global.config;
 
+import coin.stock.application.BatchService;
 import coin.stock.application.TickerService;
 import coin.stock.entity.Market;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,10 +17,10 @@ import java.util.stream.Collectors;
 public class WebSocketClient {
 
     private final ObjectMapper objectMapper;
-    private final TickerService tickerService;
+    private final BatchService batchService;
 
-    public WebSocketClient(TickerService tickerService, ObjectMapper objectMapper) {
-        this.tickerService = tickerService;
+    public WebSocketClient(ObjectMapper objectMapper, BatchService batchService) {
+        this.batchService = batchService;
         this.objectMapper = objectMapper;
     }
 
@@ -29,7 +30,7 @@ public class WebSocketClient {
 
         WebSocketConnectionManager webSocketConnectionManager = new WebSocketConnectionManager(
                 client,
-                new SimpleWebSocketHandler(objectMapper, tickerService),
+                new SimpleWebSocketHandler(objectMapper, batchService),
                 URI.create("wss://api.upbit.com/websocket/v1")
         );
         webSocketConnectionManager.start();
