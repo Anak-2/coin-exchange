@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class MarketService {
 
@@ -44,7 +46,7 @@ public class MarketService {
             );
             marketUpdater.updateMarketsByMap(MarketProperties.toEntities(marketProperties));
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Error: {}", e.getMessage());
         }
     }
 

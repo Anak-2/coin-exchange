@@ -7,6 +7,7 @@ import org.java_websocket.client.WebSocketClient;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.client.WebSocketConnectionManager;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
+import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
@@ -35,14 +36,14 @@ public class WebSocketTest {
             Thread.sleep(3 * 1000);
         }
         while(webSocketSession.isOpen()){
+            System.out.println("호출");
             String payload = "[{\"ticket\":\"1251231241254125123412412\"},{\"type\":\"ticker\",\"codes\":[\"KRW-BTC\"]}]";
-            System.out.println(payload);
             webSocketSession.sendMessage(new TextMessage(payload));
-            Thread.sleep(10 * 1000);
+            Thread.sleep(100 * 1000);
         }
     }
 
-    private static class SimpleWebSocketHandler extends TextWebSocketHandler {
+    private static class SimpleWebSocketHandler extends BinaryWebSocketHandler {
         @Override
         public void afterConnectionEstablished(WebSocketSession session) throws Exception {
             System.out.println("after connection established");
@@ -51,7 +52,6 @@ public class WebSocketTest {
 
         @Override
         public void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
-            super.handleBinaryMessage(session, message);
             ByteBuffer payload = message.getPayload();
             String jsonString = StandardCharsets.UTF_8.decode(payload).toString();
             System.out.println("Received Binary Message: " + jsonString);
@@ -62,12 +62,6 @@ public class WebSocketTest {
             } catch (Exception e) {
                 System.err.println("Error parsing binary message: " + e.getMessage());
             }
-        }
-
-        @Override
-        public void handleMessage(final WebSocketSession session, final WebSocketMessage<?> message) throws Exception {
-            super.handleMessage(session, message);
-            System.out.println("Handle Message");
         }
 
         @Override
@@ -85,8 +79,7 @@ public class WebSocketTest {
         List<Map<String, Object>> request = new ArrayList<>();
 
         Map<String, Object> ticketField = new HashMap<>();
-//        ticketField.put("ticket", UUID.randomUUID().toString());
-        ticketField.put("ticket", "test example");
+        ticketField.put("ticket", UUID.randomUUID().toString());
         request.add(ticketField);
 
         Map<String, Object> typeField1 = new HashMap<>();

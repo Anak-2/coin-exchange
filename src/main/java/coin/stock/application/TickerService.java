@@ -1,26 +1,42 @@
 package coin.stock.application;
 
 import coin.stock.domain.TickerProperties;
+import coin.stock.entity.Market;
+import coin.stock.entity.Ticker;
 import coin.stock.repository.MarketRepository;
+import coin.stock.repository.TickerRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.socket.TextMessage;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
+import static coin.stock.global.config.AppConfig.SocketTicketUUID;
+import static coin.stock.global.config.AppConfig.externalApiSocketSession;
+
+@Slf4j
 @Service
 public class TickerService {
 
     private final RestTemplate restTemplate;
-    private final MarketRepository marketRepository;
+    private final TickerRepository tickerRepository;
     private final ObjectMapper objectMapper;
 
-    public TickerService(RestTemplate restTemplate, MarketRepository marketRepository, ObjectMapper objectMapper) {
+    public TickerService(RestTemplate restTemplate, TickerRepository tickerRepository, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
-        this.marketRepository = marketRepository;
+        this.tickerRepository = tickerRepository;
         this.objectMapper = objectMapper;
+    }
+
+    public void save(TickerProperties tickerProperties){
+        Ticker entity = tickerProperties.toEntity();
+        tickerRepository.save(entity);
     }
 
     public void fetchTickerPerMarketWithRestTemplate(List<String> market) {
@@ -39,11 +55,35 @@ public class TickerService {
             String prettyJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(tickerProperties);
             System.out.println(prettyJson);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Error When FetchTicker: {}", e.getMessage());
         }
     }
 
-    public void fetchTickerWithWebsocket(){
+    public void fetchTickerWithWebsocket(List<String> market){
+        if (externalApiSocketSession != null && externalApiSocketSession.isOpen()) {
+            String payload = createPayload(market);
+            log.info("Payload: {}", payload);
+            try {
+                externalApiSocketSession.sendMessage(new TextMessage(payload));
+            } catch (Exception e) {
+                log.error("Error When FetchTicker: {}", e.getMessage());
+            }
+        } else {
+            log.info("socket session is null or closed");
+        }
+    }
 
+    private String createPayload(List<String> marketCodes) {
+        List<Object> request = List.of(
+                Map.of("ticket", SocketTicketUUID),
+                Map.of("type", "ticker", "codes", marketCodes),
+                Map.of("format", "DEFAULT")
+        );
+
+        try {
+            return objectMapper.writeValueAsString(request);
+        } catch (Exception e) {
+            throw new RuntimeException("Error creating payload", e);
+        }
     }
 }

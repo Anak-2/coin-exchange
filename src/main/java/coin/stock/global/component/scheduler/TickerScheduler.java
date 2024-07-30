@@ -3,6 +3,7 @@ package coin.stock.global.component.scheduler;
 import coin.stock.application.MarketService;
 import coin.stock.application.TickerService;
 import coin.stock.entity.Market;
+import jakarta.annotation.PostConstruct;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -16,21 +17,18 @@ public class TickerScheduler {
 
     private final TickerService tickerService;
     private final MarketService marketService;
-    private int cnt = 1;
 
     public TickerScheduler(TickerService tickerService, MarketService marketService) {
         this.tickerService = tickerService;
         this.marketService = marketService;
     }
 
-    @Scheduled(fixedRate = 60000)
-    public void scheduledFetchTicker() {
+    @Scheduled(fixedRate = 12 * 60 * 60 * 1000)
+    public void initFetchTickerBySocket() {
         List<Market> allMarket = marketService.getAllMarket();
         if(!allMarket.isEmpty()){
             List<String> allMarketName = allMarket.stream().map(Market::getMarket).toList();
-            List<List<String>> chunkedMarketName = chunkList(allMarketName, 10);
-            chunkedMarketName.forEach(tickerService::fetchTickerPerMarketWithRestTemplate);
-            cnt++;
+            tickerService.fetchTickerWithWebsocket(allMarketName);
         }
     }
 
