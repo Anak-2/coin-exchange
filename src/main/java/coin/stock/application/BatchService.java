@@ -23,15 +23,10 @@ public class BatchService {
     private Job importTickerJob;
 
     public void saveTickers(List<TickerProperties> tickers) {
-        // 새로운 ListItemReader를 생성하여 데이터를 설정합니다.
-        ListItemReader<TickerProperties> reader = new ListItemReader<>(tickers);
-
-        // JobParameters를 생성합니다.
         JobParameters jobParameters = new JobParametersBuilder()
                 .addLong("time", System.currentTimeMillis())
                 .toJobParameters();
 
-        // importTickerJob을 실행합니다.
         try {
             jobLauncher.run(importTickerJob, jobParameters);
         } catch (Exception e) {

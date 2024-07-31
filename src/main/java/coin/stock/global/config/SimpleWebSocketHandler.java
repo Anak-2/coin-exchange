@@ -3,6 +3,7 @@ package coin.stock.global.config;
 import coin.stock.application.BatchService;
 import coin.stock.application.TickerService;
 import coin.stock.domain.TickerProperties;
+import coin.stock.repository.TickerRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -21,13 +22,14 @@ import java.util.List;
 public class SimpleWebSocketHandler extends BinaryWebSocketHandler {
 
     private final ObjectMapper objectMapper;
-    private final BatchService batchService;
+    private final TickerRepository tickerRepository;
+//    private final BatchService batchService;
     private final List<TickerProperties> buffer = new ArrayList<>();
     private static final int BUFFER_SIZE = 100;
 
-    public SimpleWebSocketHandler(ObjectMapper objectMapper, BatchService batchService) {
+    public SimpleWebSocketHandler(ObjectMapper objectMapper, TickerRepository tickerRepository) {
         this.objectMapper = objectMapper;
-        this.batchService = batchService;
+        this.tickerRepository = tickerRepository;
     }
 
     @Override
@@ -45,7 +47,9 @@ public class SimpleWebSocketHandler extends BinaryWebSocketHandler {
 //            todo: 현재는 마켓 하나하나 insert 문이 나가도록 되어있음. Batch로 쿼리문 줄이기
             buffer.add(tickerProperties);
             if (buffer.size() >= BUFFER_SIZE) {
-                batchService.saveTickers(new ArrayList<>(buffer));
+                log.info("batch save");
+//                batchService.saveTickers(new ArrayList<>(buffer));
+                tickerRepository.saveAll(buffer.stream().map(TickerProperties::toEntity).toList());
                 buffer.clear();
             }
             log.info("Parsed JSON: {}", tickerProperties);
