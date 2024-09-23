@@ -52,9 +52,8 @@ public class CandleService {
     public void init() {
         marketService.renewalMarkets();
 
-        // cleanRedisDB가 완료된 후에만 initRedisCandleFromMongo 실행
         cleanRedisDB()
-                .then(Mono.fromRunnable(this::initRedisCandleFromMongo))  // DB 클리어 후에 Mongo 데이터를 Redis에 초기화
+                .then(Mono.fromRunnable(this::initRedisCandleFromMongo))
                 .subscribe(success -> log.debug("Redis initialized with Mongo data."),
                         error -> log.debug("Error initializing Redis: {}", error.getMessage()));
 
@@ -72,7 +71,6 @@ public class CandleService {
                 });
     }
 
-    // MongoDB에서 모든 데이터 가져오기
     private void initRedisCandleFromMongo() {
         log.debug("Starting initRedisCandleFromMongo...");
 
@@ -101,21 +99,24 @@ public class CandleService {
 
                 byteArrayRedisTemplate.opsForList()
                         .rightPush(key, pCandle.toByteArray())  // Redis 리스트에 저장
-                        .doOnSuccess(result -> log.debug("Successfully pushed to Redis: {}", key))
                         .subscribe();
             } catch (Exception e) {
                 log.debug("Error serializing candle data: {}", e.getMessage());
             }
         });
 
-        tickerService.fetchStart();
+        List<String> marketCodes = marketService.getAllMarketCodes();
+        tickerService.fetchStart(marketCodes);
     }
 
-    // Redis 데이터베이스를 삭제하는 메서드
+    // Redis 데이터베이스에서 "market" 키를 제외한 모든 데이터를 삭제
     private Mono<Void> cleanRedisDB() {
-        return byteArrayRedisTemplate.execute(connection -> connection.serverCommands().flushAll())  // Redis에서 모든 데이터 삭제
-                .then(Mono.just("Redis cache cleared on startup."))
-                .doOnSuccess(log::debug)  // 성공 시 메시지 출력
-                .then();  // Void 반환
+        return stringRedisTemplate.keys("*")
+                .filter(key -> !key.equals(MARKET))
+                .flatMap(stringRedisTemplate::delete)
+                .then(Mono.just("Redis cache cleared except 'market' key on startup."))
+                .doOnSuccess(log::debug)
+                .doOnError(Throwable::printStackTrace)
+                .then();
     }
 }
