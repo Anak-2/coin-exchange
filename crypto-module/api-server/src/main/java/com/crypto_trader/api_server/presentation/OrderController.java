@@ -1,12 +1,11 @@
 package com.crypto_trader.api_server.presentation;
 
+import com.crypto_trader.api_server.application.OrderExecutionService;
 import com.crypto_trader.api_server.application.OrderService;
-import com.crypto_trader.api_server.application.dto.OrderCancelRequestDto;
-import com.crypto_trader.api_server.application.dto.OrderCreateRequestDto;
-import com.crypto_trader.api_server.application.dto.OrderResponseDto;
+import com.crypto_trader.api_server.dto.OrderCancelRequestDto;
+import com.crypto_trader.api_server.dto.OrderCreateRequestDto;
+import com.crypto_trader.api_server.dto.OrderResponseDto;
 import com.crypto_trader.api_server.auth.PrincipalUser;
-import com.crypto_trader.api_server.domain.entities.UserEntity;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,9 +14,11 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrderService orderService;
+    private final OrderExecutionService orderExecutionService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, OrderExecutionService orderExecutionService) {
         this.orderService = orderService;
+        this.orderExecutionService = orderExecutionService;
     }
 
     @PostMapping("/create")

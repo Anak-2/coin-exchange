@@ -11,11 +11,10 @@ import com.crypto_trader.api_server.infra.TickerRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import jakarta.persistence.LockModeType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
-import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.Disposable;
@@ -29,26 +28,32 @@ import java.util.Map;
 @Service
 public class OrderExecutionService {
 
-    private final OrderService orderService;
+    private final ProcessOrderExecution orderExecution;
+
     private final TickerRepository tickerRepository;
     private final SimpleMarketRepository marketRepository;
+    private final OrderRepository orderRepository;
+
+    private final ApplicationEventPublisher publisher;
     private final ObjectMapper objectMapper;
-    private final ApplicationEventPublisher eventPublisher;
 
     private final Map<String, Sinks.Many<Ticker>> sinkMap = new HashMap<>();
     private final Map<String, Disposable> subscriptionMap = new HashMap<>();
 
+
     @Autowired
-    public OrderExecutionService(OrderService orderService,
+    public OrderExecutionService(ProcessOrderExecution orderExecution,
                                  TickerRepository tickerRepository,
                                  SimpleMarketRepository marketRepository,
-                                 ObjectMapper objectMapper,
-                                 ApplicationEventPublisher eventPublisher) {
-        this.orderService = orderService;
+                                 OrderRepository orderRepository,
+                                 ApplicationEventPublisher publisher,
+                                 ObjectMapper objectMapper) {
+        this.orderExecution = orderExecution;
         this.tickerRepository = tickerRepository;
         this.marketRepository = marketRepository;
+        this.orderRepository = orderRepository;
+        this.publisher = publisher;
         this.objectMapper = objectMapper;
-        this.eventPublisher = eventPublisher;
     }
 
     @PostConstruct
@@ -71,8 +76,8 @@ public class OrderExecutionService {
             sinkMap.put(code, sink);
 
             Disposable subscription = sink.asFlux()
-                    .sampleFirst(Duration.ofSeconds(1))  // 1초에 한 번 처리
-                    .subscribe(ticker -> eventPublisher.publishEvent(new TickerProcessingEvent(this, ticker)));
+                    .sampleFirst(Duration.ofMillis(1000))  // 0.5 초에 한 번 처리(쓰로틀링)
+                    .subscribe(ticker -> publisher.publishEvent(new TickerProcessingEvent(this, ticker)));
 
             subscriptionMap.put(code, subscription);
         }
@@ -113,7 +118,35 @@ public class OrderExecutionService {
     @EventListener
     public void processTicker(TickerProcessingEvent event) {
         Ticker ticker = event.getTicker();
-        List<Order> ordersToProcess = orderService.getOrderToProcess(ticker.getMarket(), ticker.getTradePrice());
-        ordersToProcess.forEach(orderService::processOrderWithLock);
+        processOrderExecution(ticker.getMarket(), ticker.getTradePrice());
+    }
+
+    public void processOrderExecution(String market, double tradePrice) {
+        int pageSize = 20000;
+        int pageNumber = 0;
+
+        boolean isLast;
+        do {
+            PageRequest pageable = PageRequest.of(pageNumber, pageSize);
+            isLast = orderExecution.process(market, tradePrice, pageable);
+
+            pageNumber++;
+        } while (!isLast);
+    }
+
+    @Transactional
+    public void oldProcessOrderExecution(String market, double tradePrice) throws InterruptedException {
+        long start = System.currentTimeMillis();
+        List<Order> byMarket = orderRepository.findByMarket(market);
+        System.out.println("old lock " + (System.currentTimeMillis() - start));
+        Thread.sleep(10000);
+        byMarket.stream()
+                .filter(order -> {
+                    double price = order.getPrice().doubleValue();
+                    return order.getState() == OrderState.CREATED &&
+                            ((order.getSide() == OrderSide.BID) ? tradePrice <= price : tradePrice >= price);
+                })
+                .forEach(Order::execution);
+        System.out.println("old order execution completed " + (System.currentTimeMillis() - start));
     }
 }

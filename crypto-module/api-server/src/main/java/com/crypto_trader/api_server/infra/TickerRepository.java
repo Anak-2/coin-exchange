@@ -1,12 +1,12 @@
 package com.crypto_trader.api_server.infra;
 
+import com.crypto_trader.api_server.config.redis.ReactiveRedisPubSubTemplate;
 import com.crypto_trader.api_server.domain.Ticker;
 import com.crypto_trader.api_server.domain.events.TickerChangeEvent;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.connection.ReactiveSubscription;
-import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 
@@ -20,9 +20,9 @@ import static com.crypto_trader.api_server.global.constant.Constants.TICKER;
 @Repository
 public class TickerRepository {
 
-    private final ReactiveRedisTemplate<String, String> redisTemplate;
-    private final ApplicationEventPublisher publisher;
+    private final ReactiveRedisPubSubTemplate<String> pubSubTemplate;
     private final SimpleMarketRepository simpleMarketRepository;
+    private final ApplicationEventPublisher publisher;
 
     private final Map<String, Ticker> tickers = new ConcurrentHashMap<>();
 
@@ -32,17 +32,20 @@ public class TickerRepository {
     }
 
     @Autowired
-    public TickerRepository(ReactiveRedisTemplate<String, String> redisTemplate,
-                            ApplicationEventPublisher publisher,
-                            SimpleMarketRepository simpleMarketRepository) {
-        this.redisTemplate = redisTemplate;
-        this.publisher = publisher;
+    public TickerRepository(ReactiveRedisPubSubTemplate<String> pubSubTemplate,
+                            SimpleMarketRepository simpleMarketRepository,
+                            ApplicationEventPublisher publisher) {
+        this.pubSubTemplate = pubSubTemplate;
         this.simpleMarketRepository = simpleMarketRepository;
+        this.publisher = publisher;
     }
 
     public void save(Ticker ticker) {
         tickers.put(ticker.getMarket(), ticker);
-        publisher.publishEvent(new TickerChangeEvent(this, ticker));
+        try {
+            publisher.publishEvent(new TickerChangeEvent(this, ticker));
+        } catch (IllegalStateException e) { } // ignore
+
     }
 
     public Ticker findTickerByMarket(String marketCode) {
@@ -54,12 +57,14 @@ public class TickerRepository {
     }
 
     public Flux<? extends ReactiveSubscription.Message<String, String>> getChannel() {
-        return redisTemplate
+        return pubSubTemplate
+                .select()
                 .listenToChannel(TICKER);
     }
 
     private void initTickers() {
-        simpleMarketRepository.marketCodesUpdates()
+        simpleMarketRepository
+                .marketCodesUpdates()
                 .doOnNext(marketCodes -> {
                     for (String marketCode : marketCodes) {
                         Ticker ticker = new Ticker(marketCode, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);

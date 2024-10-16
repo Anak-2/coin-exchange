@@ -1,7 +1,8 @@
 package com.crypto_trader.scheduler.infra;
 
+import com.crypto_trader.scheduler.config.redis.ReactiveRedisPubSubTemplate;
 import com.crypto_trader.scheduler.domain.Market;
-import com.crypto_trader.scheduler.domain.event.MarketsUpdateEvent;
+import com.crypto_trader.scheduler.domain.event.FetchTickerEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,17 +18,17 @@ import static com.crypto_trader.scheduler.global.constant.RedisConst.MARKET;
 @Repository
 public class SimpleMarketRepository {
 
-    private final ReactiveRedisTemplate<String, String> redisTemplate;
+    private final ReactiveRedisPubSubTemplate<String> pubSubTemplate;
     private final ApplicationEventPublisher publisher;
     private final ObjectMapper objectMapper;
 
     private final Map<String, Market> markets = new HashMap<>();
 
     @Autowired
-    public SimpleMarketRepository(ReactiveRedisTemplate<String, String> redisTemplate,
+    public SimpleMarketRepository(ReactiveRedisPubSubTemplate<String> pubSubTemplate,
                                   ApplicationEventPublisher publisher,
                                   ObjectMapper objectMapper) {
-        this.redisTemplate = redisTemplate;
+        this.pubSubTemplate = pubSubTemplate;
         this.publisher = publisher;
         this.objectMapper = objectMapper;
     }
@@ -44,10 +45,12 @@ public class SimpleMarketRepository {
 
         if (isModified) {
             try {
-                redisTemplate.opsForValue()
+                pubSubTemplate
+                        .master
+                        .opsForValue()
                         .set(MARKET, objectMapper.writeValueAsString(markets.keySet()))
                         .block();
-                publisher.publishEvent(new MarketsUpdateEvent(this));
+                publisher.publishEvent(new FetchTickerEvent(this));
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }

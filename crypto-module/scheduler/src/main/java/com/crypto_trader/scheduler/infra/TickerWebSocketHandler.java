@@ -1,9 +1,12 @@
 package com.crypto_trader.scheduler.infra;
 
+import com.crypto_trader.scheduler.config.redis.ReactiveRedisPubSubTemplate;
+import com.crypto_trader.scheduler.domain.event.FetchTickerEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
@@ -21,28 +24,33 @@ import static com.crypto_trader.scheduler.global.utils.StringUtils.*;
 @Component
 public class TickerWebSocketHandler extends BinaryWebSocketHandler {
 
+    private final ReactiveRedisPubSubTemplate<String> pubSubTemplate;
+    private final ApplicationEventPublisher publisher;
     private final ObjectMapper objectMapper;
-    private final ReactiveRedisTemplate<String, String> redisTemplate;
 
     // private state
     private WebSocketSession session;
 
     @Autowired
-    public TickerWebSocketHandler(ObjectMapper objectMapper, ReactiveRedisTemplate<String, String> redisTemplate) {
+    public TickerWebSocketHandler(ReactiveRedisPubSubTemplate<String> pubSubTemplate,
+                                  ApplicationEventPublisher publisher,
+                                  ObjectMapper objectMapper) {
+        this.pubSubTemplate = pubSubTemplate;
+        this.publisher = publisher;
         this.objectMapper = objectMapper;
-        this.redisTemplate = redisTemplate;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         this.session = session;
+        publisher.publishEvent(new FetchTickerEvent(this));
     }
 
     @Override
     protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws Exception {
         super.handleBinaryMessage(session, message);
         String tickerJson = decodeToString(message.getPayload());
-        redisTemplate.convertAndSend(REDIS_TICKER, tickerJson).subscribe(); // publish
+        pubSubTemplate.publish(REDIS_TICKER, tickerJson);
     }
 
     @Override
@@ -58,7 +66,6 @@ public class TickerWebSocketHandler extends BinaryWebSocketHandler {
     public void fetchAllTicker(List<String> marketCodes) {
         if (session == null || !session.isOpen())
             return;
-
 
         try {
             String payload = createPayload(marketCodes);
