@@ -2,7 +2,7 @@
 - 차트: https://youtu.be/sH0vQYZbY-s
 
 ## 아키텍처
-![Cryptor](https://github.com/user-attachments/assets/a586f650-d7e5-4683-a4f1-249e37ae268b)
+![스크린샷 2024-11-18 204533](https://github.com/user-attachments/assets/0f2e1eb6-d5bb-4f71-b973-383cf0c3398c)
 
 ## 프로젝트 목표
 - 가상 거래소 시스템을 구현하는 것이 목표 입니다.
